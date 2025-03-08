@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import Sidebar from '@/components/Sidebar';
@@ -15,6 +16,7 @@ const Index = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiKey, setApiKey] = useState<string>("");
   const { toast } = useToast();
 
   const handleSendMessage = async (content: string) => {
@@ -27,22 +29,43 @@ const Index = () => {
       return;
     }
 
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please enter your OpenAI API key in the sidebar",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      const newMessages = [
-        ...messages,
-        { role: 'user', content } as const
-      ];
+      const newUserMessage = { role: 'user', content } as const;
+      const newMessages = [...messages, newUserMessage];
       
       setMessages(newMessages);
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      const response = await fetch('https://SUPABASE_PROJECT_ID.supabase.co/functions/v1/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: newMessages,
+          apiKey,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Error calling API');
+      }
 
       const assistantMessage: Message = {
         role: 'assistant',
-        content: "I am a hardcoded response. The database connection has been removed for testing purposes. You can modify this response in the Index.tsx file."
+        content: data.content
       };
 
       setMessages([...newMessages, assistantMessage]);
@@ -57,12 +80,16 @@ const Index = () => {
     }
   };
 
+  const handleApiKeyChange = (newApiKey: string) => {
+    setApiKey(newApiKey);
+  };
+
   return (
     <div className="flex h-screen">
       <Sidebar 
         isOpen={isSidebarOpen} 
         onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-        onApiKeyChange={() => {}} // Empty function since we don't need API key anymore
+        onApiKeyChange={handleApiKeyChange}
       />
       
       <main className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'ml-64' : 'ml-0'}`}>
